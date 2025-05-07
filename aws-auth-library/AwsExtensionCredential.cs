@@ -1,0 +1,30 @@
+﻿using Amazon.SecurityToken.Model;
+using System;
+
+namespace aws_auth_library
+{
+    public class AwsExtensionCredential
+    {
+        private Credentials _awsCredentials;
+        internal string CredentialProfile { get; set; }
+        public CredentialMethod CredentialMethod { get; set; }
+        public string RoleArn { get; set; }
+
+        public AwsExtensionCredential(CredentialMethod method, Credentials awsCredentials, string credentialProfile = null)
+        {
+            _awsCredentials = awsCredentials;
+            CredentialMethod = method;
+            CredentialProfile = credentialProfile;
+        }
+
+        private void LogCredentialInformation()
+        {
+
+        }
+
+        internal Credentials GetAwsCredentialObject()
+        {
+            return _awsCredentials;
+        }
+    }
+}
