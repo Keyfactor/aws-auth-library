@@ -1,4 +1,5 @@
-﻿using Amazon.SecurityToken.Model;
+﻿using Amazon;
+using Amazon.SecurityToken.Model;
 using System;
 
 namespace aws_auth_library
@@ -9,6 +10,8 @@ namespace aws_auth_library
         internal string CredentialProfile { get; set; }
         public CredentialMethod CredentialMethod { get; set; }
         public string RoleArn { get; set; }
+
+        public RegionEndpoint Region {  get; set; }
 
         public AwsExtensionCredential(CredentialMethod method, Credentials awsCredentials, string credentialProfile = null)
         {
@@ -22,7 +25,7 @@ namespace aws_auth_library
 
         }
 
-        internal Credentials GetAwsCredentialObject()
+        public Credentials GetAwsCredentialObject()
         {
             return _awsCredentials;
         }
