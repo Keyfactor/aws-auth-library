@@ -15,6 +15,7 @@
 using System;
 using System.Net;
 using System.Text;
+using Amazon;
 using Amazon.Runtime;
 using Amazon.Runtime.Internal.Util;
 using Amazon.SecurityToken;
@@ -42,7 +43,7 @@ namespace aws_auth_library
             _logger = logger;
         }
 
-        public Credentials GetCredentials(AuthCustomFieldParameters customFields, CertificateStore certStore)
+        public AwsExtensionCredential GetCredentials(AuthCustomFieldParameters customFields, CertificateStore certStore)
         {
             _logger.MethodEntry();
 
@@ -66,7 +67,9 @@ namespace aws_auth_library
             }
             _logger.LogDebug($"AWS Role ARN - {roleArn}");
             string region = certStore.StorePath;
-            _logger.LogDebug($"AWS Region - {region}");
+            _logger.LogTrace($"AWS Region specified in Store Path - {region}");
+            var endpoint = RegionEndpoint.GetBySystemName(region);
+            _logger.LogDebug($"AWS Region Endpoint - {JsonConvert.SerializeObject(endpoint)}");
             
             _logger.LogDebug("Selecting credential method.");
             CredentialMethod credentialMethod;
@@ -89,7 +92,7 @@ namespace aws_auth_library
                     credentialMethod = CredentialMethod.DefaultSdk_CredentialProfile_AssumeRole;
                 }
             }
-            else
+            else if (customFields.UseDefaultSdkAuth)
             {
                 if (string.IsNullOrEmpty(credentialProfile))
                 {
@@ -100,8 +103,16 @@ namespace aws_auth_library
                     credentialMethod = CredentialMethod.DefaultSdk_CredentialProfile;
                 }
             }
+            else
+            {
+                // no auth method set
+                throw new Exception("No Auth method selected. This is an invalid configuration.");
+            }
             _logger.LogInformation($"Credential method in use for AWS Auth - {credentialMethod}");
 
+            AwsExtensionCredential extensionCredential;
+            // TODO: rename methods to Assume Role
+            // TODO: use Region Endpoint for Assume Role calls
             switch (credentialMethod)
             {
                 case CredentialMethod.IamUser:
@@ -112,7 +123,9 @@ namespace aws_auth_library
                     _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
                     _logger.LogTrace("Attempting to authenticate with AWS using IAM access credentials.");
-                    return AwsAuthenticate(accessKey, accessSecret, roleArn, customFields.ExternalId);
+                    var awsCredentials = AwsAuthenticate(accessKey, accessSecret, roleArn, customFields.ExternalId);
+                    extensionCredential = new AwsExtensionCredential(credentialMethod, awsCredentials);
+                    break;
                 case CredentialMethod.OAuthProvider:
                     _logger.LogInformation("Using OAuth authentication method for creating AWS Credentials.");
                     var clientId = ResolvePamField(customFields.OAuthClientId, "OAuthClientId");
@@ -133,7 +146,9 @@ namespace aws_auth_library
                     _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
                     _logger.LogTrace("Attempting to authenticate with AWS using OAuth response.");
-                    return AwsAuthenticateWithWebIdentity(authResponse, roleArn);
+                    awsCredentials = AwsAuthenticateWithWebIdentity(authResponse, roleArn);
+                    extensionCredential = new AwsExtensionCredential(credentialMethod, awsCredentials);
+                    break;
                 case CredentialMethod.DefaultSdk_AssumeRole:
                     // use SDK credential resolution, but run Assume Role
                     _logger.LogInformation("Using default AWS SDK credential resolution with Assume Role for creating AWS Credentials.");
@@ -141,15 +156,24 @@ namespace aws_auth_library
                     _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
                     _logger.LogTrace("Attempting to assume new Role with AWS using default AWS SDK credential.");
-                    return AwsAuthenticate(null, null, roleArn, customFields.ExternalId);
+                    awsCredentials = AwsAuthenticate(null, null, roleArn, customFields.ExternalId);
+                    extensionCredential = new AwsExtensionCredential(credentialMethod, awsCredentials);
+                    break;
                 // TODO: add case for where Profile is specified
                 case CredentialMethod.DefaultSdk:
                 default:
                     _logger.LogInformation("Using default AWS SDK credential resolution for creating AWS Credentials.");
                     // TODO: update logging message
                     _logger.LogDebug($"Default Role and Account ID will be used. Specified AWS Role ARN - {roleArn} - will not be used.");
-                    return null;
+                    extensionCredential = new AwsExtensionCredential(credentialMethod, null);
+                    break;
             }
+
+            // TODO: add logging
+            // store parameter values into final credential object
+            extensionCredential.RoleArn = roleArn;
+            extensionCredential.Region = endpoint;
+            return extensionCredential;
         }
 
         public Credentials AwsAuthenticateWithWebIdentity(OAuthResponse authResponse, string roleArn)
@@ -158,6 +182,7 @@ namespace aws_auth_library
             Credentials credentials = null;
             try
             {
+                // TODO: make region specific
                 var stsClient = new AmazonSecurityTokenServiceClient(new AnonymousAWSCredentials());
                 _logger.LogTrace("Created AWS STS client with anonymous credentials.");
                 var assumeRequest = new AssumeRoleWithWebIdentityRequest
@@ -197,6 +222,7 @@ namespace aws_auth_library
             Credentials credentials = null;
             try
             {
+                // TODO: make region specific
                 AmazonSecurityTokenServiceClient stsClient;
                 if (accessKey != null && accessSecret != null)
                 {
@@ -205,6 +231,7 @@ namespace aws_auth_library
                 }
                 else
                 {
+                    // TODO: needs to load with Credential Profile in mind
                     stsClient = new AmazonSecurityTokenServiceClient();
                     _logger.LogTrace("Created AWS STS client with default credential resolution.");
                 }
