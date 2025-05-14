@@ -45,64 +45,110 @@ namespace aws_auth_library
         public Credentials GetCredentials(AuthCustomFieldParameters customFields, CertificateStore certStore)
         {
             _logger.MethodEntry();
-            _logger.LogDebug("Selecting credential method.");
 
-            string roleArn = certStore.ClientMachine;
+            _logger.LogDebug("Checking Client Machine field for prescence of credential [profile] value.");
+            string roleArn, credentialProfile;
+            if(certStore.ClientMachine.StartsWith('['))
+            {
+                _logger.LogTrace("Credential [profile] detected, parsing value.");
+                string[] split = certStore.ClientMachine.Split(']');
+                _logger.LogTrace($"Client Machine split on ']' into {split.Length} fields. 2 fields should be found.");
+                _logger.LogTrace($"Found profile {split[0]} - removing '[' and ']'");
+                credentialProfile = split[0].TrimStart('[').TrimEnd(']');
+                roleArn = split[1];
+                _logger.LogDebug($"Credential profile will be used - {credentialProfile}");
+            }
+            else
+            {
+                _logger.LogDebug("No [profile] value detected. Using Client Machine directly as Role ARN.");
+                roleArn = certStore.ClientMachine;
+                credentialProfile = "";
+            }
+            _logger.LogDebug($"AWS Role ARN - {roleArn}");
             string region = certStore.StorePath;
-
+            _logger.LogDebug($"AWS Region - {region}");
+            
+            _logger.LogDebug("Selecting credential method.");
+            CredentialMethod credentialMethod;
             if (customFields.UseIAM)
             {
-                _logger.LogInformation("Using IAM User authentication method for creating AWS Credentials.");
-                var accessKey = ResolvePamField(customFields.IamUserAccessKey, "IamUserAccessKey");
-                var accessSecret = ResolvePamField(customFields.IamUserAccessSecret, "IamUserAccessSecret");
-
-                _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
-
-                _logger.LogTrace("Attempting to authenticate with AWS using IAM access credentials.");
-                return AwsAuthenticate(accessKey, accessSecret, roleArn, customFields.ExternalId);
+                credentialMethod = CredentialMethod.IamUser;
             }
             else if (customFields.UseOAuth)
             {
-                _logger.LogInformation("Using OAuth authentication method for creating AWS Credentials.");
-                var clientId = ResolvePamField(customFields.OAuthClientId, "OAuthClientId");
-                var clientSecret = ResolvePamField(customFields.OAuthClientSecret, "OAuthClientSecret");
-                OAuthParameters oauthParams = new OAuthParameters()
-                {
-                    OAuthUrl = customFields.OAuthUrl,
-                    GrantType = customFields.OAuthGrantType,
-                    Scope = customFields.OAuthScope,
-                    ClientId = clientId,
-                    ClientSecret = clientSecret
-                };
-
-                _logger.LogTrace("Attempting to authenticate with OAuth provider.");
-                OAuthResponse authResponse = OAuthAuthenticate(oauthParams);
-                _logger.LogTrace("Received OAuth response.");
-
-                _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
-
-                _logger.LogTrace("Attempting to authenticate with AWS using OAuth response.");
-                return AwsAuthenticateWithWebIdentity(authResponse, roleArn);
+                credentialMethod = CredentialMethod.OAuthProvider;
             }
             else if (customFields.DefaultSdkAssumeRole)
             {
-                // use SDK credential resolution, but run Assume Role
-                _logger.LogInformation("Using default AWS SDK credential resolution with Assume Role for creating AWS Credentials.");
-                string accessKey = null;
-                string accessSecret = null;
-
-                _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
-
-                _logger.LogTrace("Attempting to assume new Role with AWS using default AWS SDK credential.");
-                return AwsAuthenticate(accessKey, accessSecret, roleArn, customFields.ExternalId);
+                if (string.IsNullOrEmpty(credentialProfile))
+                {
+                    credentialMethod = CredentialMethod.DefaultSdk_AssumeRole;
+                }
+                else
+                {
+                    credentialMethod = CredentialMethod.DefaultSdk_CredentialProfile_AssumeRole;
+                }
             }
-            // TODO: add case for where Profile is specified
-            else // use default SDK credential resolution
+            else
             {
-                _logger.LogInformation("Using default AWS SDK credential resolution for creating AWS Credentials.");
-                // TODO: update logging message
-                _logger.LogDebug($"Default Role and Account ID will be used. Specified AWS Role ARN - {roleArn} - will not be used.");
-                return null;
+                if (string.IsNullOrEmpty(credentialProfile))
+                {
+                    credentialMethod = CredentialMethod.DefaultSdk;
+                }
+                else
+                {
+                    credentialMethod = CredentialMethod.DefaultSdk_CredentialProfile;
+                }
+            }
+            _logger.LogInformation($"Credential method in use for AWS Auth - {credentialMethod}");
+
+            switch (credentialMethod)
+            {
+                case CredentialMethod.IamUser:
+                    _logger.LogInformation("Using IAM User authentication method for creating AWS Credentials.");
+                    var accessKey = ResolvePamField(customFields.IamUserAccessKey, "IamUserAccessKey");
+                    var accessSecret = ResolvePamField(customFields.IamUserAccessSecret, "IamUserAccessSecret");
+
+                    _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
+
+                    _logger.LogTrace("Attempting to authenticate with AWS using IAM access credentials.");
+                    return AwsAuthenticate(accessKey, accessSecret, roleArn, customFields.ExternalId);
+                case CredentialMethod.OAuthProvider:
+                    _logger.LogInformation("Using OAuth authentication method for creating AWS Credentials.");
+                    var clientId = ResolvePamField(customFields.OAuthClientId, "OAuthClientId");
+                    var clientSecret = ResolvePamField(customFields.OAuthClientSecret, "OAuthClientSecret");
+                    OAuthParameters oauthParams = new OAuthParameters()
+                    {
+                        OAuthUrl = customFields.OAuthUrl,
+                        GrantType = customFields.OAuthGrantType,
+                        Scope = customFields.OAuthScope,
+                        ClientId = clientId,
+                        ClientSecret = clientSecret
+                    };
+
+                    _logger.LogTrace("Attempting to authenticate with OAuth provider.");
+                    OAuthResponse authResponse = OAuthAuthenticate(oauthParams);
+                    _logger.LogTrace("Received OAuth response.");
+
+                    _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
+
+                    _logger.LogTrace("Attempting to authenticate with AWS using OAuth response.");
+                    return AwsAuthenticateWithWebIdentity(authResponse, roleArn);
+                case CredentialMethod.DefaultSdk_AssumeRole:
+                    // use SDK credential resolution, but run Assume Role
+                    _logger.LogInformation("Using default AWS SDK credential resolution with Assume Role for creating AWS Credentials.");
+
+                    _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
+
+                    _logger.LogTrace("Attempting to assume new Role with AWS using default AWS SDK credential.");
+                    return AwsAuthenticate(null, null, roleArn, customFields.ExternalId);
+                // TODO: add case for where Profile is specified
+                case CredentialMethod.DefaultSdk:
+                default:
+                    _logger.LogInformation("Using default AWS SDK credential resolution for creating AWS Credentials.");
+                    // TODO: update logging message
+                    _logger.LogDebug($"Default Role and Account ID will be used. Specified AWS Role ARN - {roleArn} - will not be used.");
+                    return null;
             }
         }
 
@@ -261,7 +307,7 @@ namespace aws_auth_library
             }
         }
 
-        public string ResolvePamField(string field, string fieldName)
+        private string ResolvePamField(string field, string fieldName)
         {
             if (_pam != null)
             {
