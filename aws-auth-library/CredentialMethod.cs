@@ -17,9 +17,10 @@ namespace aws_auth_library
     public enum CredentialMethod
     {
         DefaultSdk,
-        DefaultSdkAssumeRole,
+        DefaultSdk_AssumeRole,
         IamUser,
         OAuthProvider,
-        DefaultSdkCredentialProfile
+        DefaultSdk_CredentialProfile,
+        DefaultSdk_CredentialProfile_AssumeRole
     }
 }

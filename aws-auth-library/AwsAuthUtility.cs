@@ -42,32 +42,30 @@ namespace aws_auth_library
             _logger = logger;
         }
 
-        public Credentials GetCredentials(AuthCustomFieldParameters customFields, JobConfiguration jobConfiguration, CertificateStore certStore)
+        public Credentials GetCredentials(AuthCustomFieldParameters customFields, CertificateStore certStore)
         {
             _logger.MethodEntry();
             _logger.LogDebug("Selecting credential method.");
 
-            string awsAccountId = certStore.ClientMachine;
+            string roleArn = certStore.ClientMachine;
+            string region = certStore.StorePath;
 
             if (customFields.UseIAM)
             {
                 _logger.LogInformation("Using IAM User authentication method for creating AWS Credentials.");
-                var accessKey = ResolvePamField(jobConfiguration.ServerUsername, "ServerUsername (IAM AccessKey)");
-                var accessSecret = ResolvePamField(jobConfiguration.ServerPassword, "ServerPassword (IAM AccessSecret)");
+                var accessKey = ResolvePamField(customFields.IamUserAccessKey, "IamUserAccessKey");
+                var accessSecret = ResolvePamField(customFields.IamUserAccessSecret, "IamUserAccessSecret");
 
-                string awsRole = customFields.IAMAssumeRole;
-                _logger.LogDebug($"Assuming AWS Role - {awsRole}");
-
-                _logger.LogDebug($"Using AWS Account ID - {awsAccountId} - from the ClientMachine field");
+                _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
                 _logger.LogTrace("Attempting to authenticate with AWS using IAM access credentials.");
-                return AwsAuthenticate(accessKey, accessSecret, awsAccountId, awsRole, customFields.ExternalId);
+                return AwsAuthenticate(accessKey, accessSecret, roleArn, customFields.ExternalId);
             }
             else if (customFields.UseOAuth)
             {
                 _logger.LogInformation("Using OAuth authentication method for creating AWS Credentials.");
-                var clientId = ResolvePamField(jobConfiguration.ServerUsername, "ServerUsername (OAuth Client ID)");
-                var clientSecret = ResolvePamField(jobConfiguration.ServerPassword, "ServerPassword (OAuth Client Secret)");
+                var clientId = ResolvePamField(customFields.OAuthClientId, "OAuthClientId");
+                var clientSecret = ResolvePamField(customFields.OAuthClientSecret, "OAuthClientSecret");
                 OAuthParameters oauthParams = new OAuthParameters()
                 {
                     OAuthUrl = customFields.OAuthUrl,
@@ -81,51 +79,45 @@ namespace aws_auth_library
                 OAuthResponse authResponse = OAuthAuthenticate(oauthParams);
                 _logger.LogTrace("Received OAuth response.");
 
-                string awsRole = customFields.OAuthAssumeRole;
-                _logger.LogDebug($"Assuming AWS Role - {awsRole}");
-
-                _logger.LogDebug($"Using AWS Account ID - {awsAccountId} - from the ClientMachine field");
+                _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
                 _logger.LogTrace("Attempting to authenticate with AWS using OAuth response.");
-                return AwsAuthenticateWithWebIdentity(authResponse, awsAccountId, awsRole);
+                return AwsAuthenticateWithWebIdentity(authResponse, roleArn);
             }
-            else if (customFields.UseEC2AssumeRole)
+            else if (customFields.DefaultSdkAssumeRole)
             {
                 // use SDK credential resolution, but run Assume Role
                 _logger.LogInformation("Using default AWS SDK credential resolution with Assume Role for creating AWS Credentials.");
                 string accessKey = null;
                 string accessSecret = null;
 
-                string awsRole = customFields.EC2AssumeRole;
-                _logger.LogDebug($"Assuming AWS Role - {awsRole}");
-
-                _logger.LogDebug($"Using AWS Account ID - {awsAccountId} - from the ClientMachine field");
+                _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
                 _logger.LogTrace("Attempting to assume new Role with AWS using default AWS SDK credential.");
-                return AwsAuthenticate(accessKey, accessSecret, awsAccountId, awsRole, customFields.ExternalId);
+                return AwsAuthenticate(accessKey, accessSecret, roleArn, customFields.ExternalId);
             }
+            // TODO: add case for where Profile is specified
             else // use default SDK credential resolution
             {
                 _logger.LogInformation("Using default AWS SDK credential resolution for creating AWS Credentials.");
-                _logger.LogDebug($"Default Role and Account ID will be used. Specified AWS Account ID - {awsAccountId} - will not be used.");
+                // TODO: update logging message
+                _logger.LogDebug($"Default Role and Account ID will be used. Specified AWS Role ARN - {roleArn} - will not be used.");
                 return null;
             }
         }
 
-        public Credentials AwsAuthenticateWithWebIdentity(OAuthResponse authResponse, string awsAccount, string awsRole)
+        public Credentials AwsAuthenticateWithWebIdentity(OAuthResponse authResponse, string roleArn)
         {
             _logger.MethodEntry();
             Credentials credentials = null;
             try
             {
-                var account = awsAccount;
-                _logger.LogTrace($"Using AWS Account - {account}");
                 var stsClient = new AmazonSecurityTokenServiceClient(new AnonymousAWSCredentials());
                 _logger.LogTrace("Created AWS STS client with anonymous credentials.");
                 var assumeRequest = new AssumeRoleWithWebIdentityRequest
                 {
                     WebIdentityToken = authResponse?.AccessToken,
-                    RoleArn = $"arn:aws:iam::{account}:role/{awsRole}",
+                    RoleArn = roleArn,
                     RoleSessionName = "KeyfactorSession",
                     DurationSeconds = Convert.ToInt32(authResponse?.ExpiresIn)
                 };
@@ -153,15 +145,12 @@ namespace aws_auth_library
             return credentials;
         }
 
-        public Credentials AwsAuthenticate(string accessKey, string accessSecret, string awsAccount, string awsRole, string externalId = null)
+        public Credentials AwsAuthenticate(string accessKey, string accessSecret, string roleArn, string externalId = null)
         {
             _logger.MethodEntry();
             Credentials credentials = null;
             try
             {
-                var account = awsAccount;
-                _logger.LogTrace($"Using AWS Account - {account}");
-
                 AmazonSecurityTokenServiceClient stsClient;
                 if (accessKey != null && accessSecret != null)
                 {
@@ -176,7 +165,7 @@ namespace aws_auth_library
 
                 var assumeRequest = new AssumeRoleRequest
                 {
-                    RoleArn = $"arn:aws:iam::{account}:role/{awsRole}",
+                    RoleArn = roleArn,
                     RoleSessionName = "KeyfactorSession",
                 };
 

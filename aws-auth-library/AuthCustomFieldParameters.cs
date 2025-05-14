@@ -20,23 +20,17 @@ namespace aws_auth_library
 {
     public class AuthCustomFieldParameters
     {
-        [JsonProperty("UseEC2AssumeRole")]
+        [JsonProperty("UseDefaultSdkAuth")]
         [DefaultValue(false)]
-        public bool UseEC2AssumeRole { get; set; }
+        public bool UseDefaultSdkAuth { get; set; }
+
+        [JsonProperty("DefaultSdkAssumeRole")]
+        [DefaultValue(false)]
+        public bool DefaultSdkAssumeRole { get; set; }
 
         [JsonProperty("UseOAuth")]
         [DefaultValue(false)]
         public bool UseOAuth { get; set; }
-
-        [JsonProperty("UseIAM")]
-        [DefaultValue(false)]
-        public bool UseIAM { get; set; }
-
-        [JsonProperty("EC2AssumeRole")]
-        public string EC2AssumeRole { get; set; }
-
-        [JsonProperty("OAuthAssumeRole")]
-        public string OAuthAssumeRole { get; set; }
 
         [JsonProperty("OAuthScope")]
         public string OAuthScope { get; set; }
@@ -47,8 +41,21 @@ namespace aws_auth_library
         [JsonProperty("OAuthUrl")]
         public string OAuthUrl { get; set; }
 
-        [JsonProperty("IAMAssumeRole")]
-        public string IAMAssumeRole { get; set; }
+        [JsonProperty("OAuthClientId")]
+        public string OAuthClientId { get; set; }
+
+        [JsonProperty("OAuthClientSecret")]
+        public string OAuthClientSecret { get; set; }
+
+        [JsonProperty("UseIAM")]
+        [DefaultValue(false)]
+        public bool UseIAM { get; set; }
+
+        [JsonProperty("IamUserAccessKey")]
+        public string IamUserAccessKey { get; set; }
+
+        [JsonProperty("IamUserAccessSecret")]
+        public string IamUserAccessSecret { get; set; }
 
         [JsonProperty("ExternalId")]
         public string ExternalId { get; set; }
