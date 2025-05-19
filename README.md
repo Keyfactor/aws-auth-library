@@ -1,0 +1,60 @@
+## Overview
+This repository is for an AWS extension library for Keyfactor integrations. It handles authenticating with AWS in any of the various methods supported by Keyfactor Orchestrators or CA plugins.
+The Nuget package of this library can be included in order to handle these AWS authentication methods. However, it requires that the specification outlined below is followed so that the fields necessary to authenticate are present.
+
+### Supported Authentication Methods
+A couple different methods of authentication are supported, and in some cases different options for the same method.
+Unless otherwise specified, the authentication method will always perform an Assume Role call to generate temporary credentials in a specific Role context. These credentials are what are returned by the library.
+
+#### Credential inference via AWS SDK
+The AWS SDK provides several methods for default credential lookup when no explicit credentials are provided.
+An exhaustive list can be found here: [(AWS Documentation) Credential and profile resolution](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html)
+
+If a specific credentials profile should be used from a shared credentials file on the system running the AWS integration, it should be specified with the Role ARN as detailed below.
+
+By default, using the Default SDK credential inference _will not_ perform any Assume Role call, and the credential context will be preserved.
+In the case that the flag `DefaultSdkAssumeRole` is set `true`, an Assume Role call will be made for the specified Role ARN. This call will be made with the credentials found by the AWS SDK, whether with a credentials [profile] or not.
+
+#### OAuth
+An OAuth token is requested based on the credentials entered, with a Client Id and Client Secret supplied. This OAuth token is used to Assume Role and get temporary credentials in AWS.
+The OAuth trust relationship needs to be properly configured in AWS for this to be a valid authentication option.
+
+#### IAM User
+Credentials for an IAM User, in the form of an Access Key and Access Secret, are supplied. The IAM User credentials are used to Assume Role.
+
+### Specification
+The following specification is split into two sections:
+- plain text inputs, which in Certificate Stores are supplied in the required fields `Client Machine` and `Store Path`
+- object specification, which is implemented via Custom Fields
+
+#### Required text inputs
+__Role ARN__
+The `Client Machine` field for Certificate Stores supplies the Role ARN for authentication. Otherwise this should be provided by a text field.
+The Role ARN can take two forms, but will always indicate a specific Role under an AWS Account ID:
+- `arn:aws:iam::<<AWS ACCOUNT ID>>:role/<<ROLE NAME>>`
+    - in some cases, portions of the ARN may differ from above when targeting special AWS environments
+- `[<<CREDENTIAL PROFILE NAME>>]arn:aws:iam::<<AWS ACCOUNT ID>>:role/<<ROLE NAME>>`
+    - this special case allows for a `[profile]` name to supplied for authentication
+    - this profile will only be used when doing Default SDK auth
+
+__Region__
+The `Store Path` field for Certificate Stores supplies the Region for authentication. This region will be used for any requests to Assume Role or generate an STS Token.
+Only a single region can be specified in this field.
+
+#### Authentication Input Object Specification
+The following fields must be implented and supplied to support all possible AWS authentication options. If the exact names are not used, and the object cannot be directly deserialized from inputs to the integration, the necessary properties should be correctly set on the Parameters object.
+
+| Field Name | Type | Value |
+| - | - | - |
+| UseDefaultSdkAuth | boolean | Set `true` if the AWS SDK should be used for authentication. This supports EC2 credential profiles. If a `[profile]` is set in the Role ARN, that credential profile will be used. |
+| DefaultSdkAssumeRole | boolean | If `UseDefaultSdkAuth` is `true`, setting this field to `true` will perform Assume Role with the credentials found by the AWS SDK. |
+| UseOAuth | boolean | Set `true` if OAuth should be used to perform initial authentication, which will then assume the specified Role ARN. |
+| OAuthScope | string | The OAuth scope to request. |
+| OAuthGrantType | string | The OAuth grant type to request. |
+| OAuthUrl | string | The OAuth token endpoint to submit the request to. |
+| OAuthClientId | secret string | The OAuth Client Id. |
+| OAuthClientSecret | secret string | The OAuth Client Secret. |
+| UseIAM | boolean | Set `true` if IAM User credentials should be used to Assume Role. |
+| IAMUserAccessKey | secret string | The IAM User Access Key. |
+| IAMUserAccessSecret | secret string | The IAM User Access Secret. |
+| ExternalId | string | Sets `sts:ExternalId` on Assume Role requests. |

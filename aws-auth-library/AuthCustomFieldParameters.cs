@@ -51,10 +51,10 @@ namespace aws_auth_library
         [DefaultValue(false)]
         public bool UseIAM { get; set; }
 
-        [JsonProperty("IamUserAccessKey")]
+        [JsonProperty("IAMUserAccessKey")]
         public string IamUserAccessKey { get; set; }
 
-        [JsonProperty("IamUserAccessSecret")]
+        [JsonProperty("IAMUserAccessSecret")]
         public string IamUserAccessSecret { get; set; }
 
         [JsonProperty("ExternalId")]
