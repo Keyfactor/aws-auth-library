@@ -43,16 +43,16 @@ namespace aws_auth_library
             _logger = logger;
         }
 
-        public AwsExtensionCredential GetCredentials(AuthCustomFieldParameters customFields, CertificateStore certStore)
+        public AwsExtensionCredential GetCredentials(AuthenticationParameters authParameters)
         {
             _logger.MethodEntry();
 
             _logger.LogDebug("Checking Client Machine field for prescence of credential [profile] value.");
             string roleArn, credentialProfile;
-            if(certStore.ClientMachine.StartsWith('['))
+            if(authParameters.RoleARN.StartsWith('['))
             {
                 _logger.LogTrace("Credential [profile] detected, parsing value.");
-                string[] split = certStore.ClientMachine.Split(']');
+                string[] split = authParameters.RoleARN.Split(']');
                 _logger.LogTrace($"Client Machine split on ']' into {split.Length} fields. 2 fields should be found.");
                 _logger.LogTrace($"Found profile {split[0]} - removing '[' and ']'");
                 credentialProfile = split[0].TrimStart('[').TrimEnd(']');
@@ -62,16 +62,17 @@ namespace aws_auth_library
             else
             {
                 _logger.LogDebug("No [profile] value detected. Using Client Machine directly as Role ARN.");
-                roleArn = certStore.ClientMachine;
+                roleArn = authParameters.RoleARN;
                 credentialProfile = "";
             }
             _logger.LogDebug($"AWS Role ARN - {roleArn}");
-            string region = certStore.StorePath;
+            string region = authParameters.Region;
             _logger.LogTrace($"AWS Region specified in Store Path - {region}");
             var endpoint = RegionEndpoint.GetBySystemName(region);
             _logger.LogDebug($"AWS Region Endpoint - {JsonConvert.SerializeObject(endpoint)}");
             
             _logger.LogDebug("Selecting credential method.");
+            var customFields = authParameters.CustomFields;
             CredentialMethod credentialMethod;
             if (customFields.UseIAM)
             {
