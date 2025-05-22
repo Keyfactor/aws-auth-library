@@ -22,6 +22,17 @@ The OAuth trust relationship needs to be properly configured in AWS for this to 
 #### IAM User
 Credentials for an IAM User, in the form of an Access Key and Access Secret, are supplied. The IAM User credentials are used to Assume Role.
 
+### Technical Considerations
+Some supported authentication methods have some considerations that should be taken into account when deploying using that method.
+
+#### Default SDK Auth
+Several settings for auth with the SDK can be configured via enviroment variables. Those features are preserved in this library. However, there is no direct interaction with those environment variables.
+Thus, the SDK evaluation method needs to be understood and the environment variables set correctly so that they adhere to the AWS SDK documentation linked above.
+
+#### OAuth
+The current implementation of requesting an OAuth token submits the Client Id and Client Secret as a Basic Authorization header.
+OAuth providers will need to be configured to accept and authenticate the Basic auth header as opposed to expecting this in the POST body.
+
 ### Specification
 The following specification is split into two sections:
 - plain text inputs, which in Certificate Stores are supplied in the required fields `Client Machine` and `Store Path`
