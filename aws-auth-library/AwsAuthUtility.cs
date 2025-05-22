@@ -27,7 +27,6 @@ using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using RestSharp;
 
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
@@ -113,7 +112,6 @@ namespace Keyfactor.Extensions.Aws
             _logger.LogInformation($"Credential method in use for AWS Auth - {credentialMethod}");
 
             AwsExtensionCredential extensionCredential;
-            // TODO: rename methods to Assume Role
             // TODO: use Region Endpoint for Assume Role calls
             switch (credentialMethod)
             {
@@ -125,7 +123,7 @@ namespace Keyfactor.Extensions.Aws
                     _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
                     _logger.LogTrace("Attempting to authenticate with AWS using IAM access credentials.");
-                    var awsCredentials = AwsAuthenticate(accessKey, accessSecret, roleArn, customFields.ExternalId);
+                    var awsCredentials = AssumeRoleMethods.AssumeRole(accessKey, accessSecret, roleArn, _logger, customFields.ExternalId);
                     extensionCredential = new AwsExtensionCredential(credentialMethod, awsCredentials);
                     break;
                 case CredentialMethod.OAuthProvider:
@@ -142,13 +140,13 @@ namespace Keyfactor.Extensions.Aws
                     };
 
                     _logger.LogTrace("Attempting to authenticate with OAuth provider.");
-                    OAuthResponse authResponse = OAuthAuthenticate(oauthParams);
+                    OAuthResponse authResponse = OAuth.Authenticate.RequestToken(oauthParams, _logger);
                     _logger.LogTrace("Received OAuth response.");
 
                     _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
                     _logger.LogTrace("Attempting to authenticate with AWS using OAuth response.");
-                    awsCredentials = AwsAuthenticateWithWebIdentity(authResponse, roleArn);
+                    awsCredentials = AssumeRoleMethods.AssumeRoleFromOAuth(authResponse, roleArn, _logger);
                     extensionCredential = new AwsExtensionCredential(credentialMethod, awsCredentials);
                     break;
                 case CredentialMethod.DefaultSdk_AssumeRole:
@@ -158,7 +156,7 @@ namespace Keyfactor.Extensions.Aws
                     _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
                     _logger.LogTrace("Attempting to assume new Role with AWS using default AWS SDK credential.");
-                    awsCredentials = AwsAuthenticate(null, null, roleArn, customFields.ExternalId);
+                    awsCredentials = AssumeRoleMethods.AssumeRole(null, null, roleArn, _logger, customFields.ExternalId);
                     extensionCredential = new AwsExtensionCredential(credentialMethod, awsCredentials);
                     break;
                 // TODO: add case for where Profile is specified
@@ -176,164 +174,6 @@ namespace Keyfactor.Extensions.Aws
             extensionCredential.RoleArn = roleArn;
             extensionCredential.Region = endpoint;
             return extensionCredential;
-        }
-
-        public Credentials AwsAuthenticateWithWebIdentity(OAuthResponse authResponse, string roleArn)
-        {
-            _logger.MethodEntry();
-            Credentials credentials = null;
-            try
-            {
-                // TODO: make region specific
-                var stsClient = new AmazonSecurityTokenServiceClient(new AnonymousAWSCredentials());
-                _logger.LogTrace("Created AWS STS client with anonymous credentials.");
-                var assumeRequest = new AssumeRoleWithWebIdentityRequest
-                {
-                    WebIdentityToken = authResponse?.AccessToken,
-                    RoleArn = roleArn,
-                    RoleSessionName = "KeyfactorSession",
-                    DurationSeconds = Convert.ToInt32(authResponse?.ExpiresIn)
-                };
-                var logAssumeRequest = new
-                {
-                    WebIdentityToken = "**redacted**",
-                    assumeRequest.RoleArn,
-                    assumeRequest.RoleSessionName,
-                    assumeRequest.DurationSeconds
-                };
-                _logger.LogDebug($"Prepared Assume Role With Web Identity request with fields: {logAssumeRequest}");
-
-                _logger.LogTrace("Submitting Assume Role With Web Identity request.");
-                var assumeResult = AsyncHelpers.RunSync(() => stsClient.AssumeRoleWithWebIdentityAsync(assumeRequest));
-                _logger.LogTrace("Received response to Assume Role With Web Identity request.");
-                credentials = assumeResult.Credentials;
-            }
-            catch (Exception e)
-            {
-                _logger.LogError($"Error Occurred in AwsAuthenticateWithWebIdentity: {e.Message}");
-
-                throw;
-            }
-
-            return credentials;
-        }
-
-        public Credentials AwsAuthenticate(string accessKey, string accessSecret, string roleArn, string externalId = null)
-        {
-            _logger.MethodEntry();
-            Credentials credentials = null;
-            try
-            {
-                // TODO: make region specific
-                AmazonSecurityTokenServiceClient stsClient;
-                if (accessKey != null && accessSecret != null)
-                {
-                    stsClient = new AmazonSecurityTokenServiceClient(accessKey, accessSecret);
-                    _logger.LogTrace("Created AWS STS client with IAM user credentials.");
-                }
-                else
-                {
-                    // TODO: needs to load with Credential Profile in mind
-                    stsClient = new AmazonSecurityTokenServiceClient();
-                    _logger.LogTrace("Created AWS STS client with default credential resolution.");
-                }
-
-                var assumeRequest = new AssumeRoleRequest
-                {
-                    RoleArn = roleArn,
-                    RoleSessionName = "KeyfactorSession",
-                };
-
-                if (string.IsNullOrWhiteSpace(externalId))
-                {
-                    // no sts:ExternalId
-                    var logAssumeRequest = new
-                    {
-                        assumeRequest.RoleArn,
-                        assumeRequest.RoleSessionName
-                    };
-                    _logger.LogDebug($"Prepared Assume Role request with fields: {logAssumeRequest}");
-                }
-                else
-                {
-                    // include sts:ExternalId with assume role request
-                    assumeRequest.ExternalId = externalId;
-                    var logAssumeRequestWithExternalId = new
-                    {
-                        assumeRequest.RoleArn,
-                        assumeRequest.RoleSessionName,
-                        assumeRequest.ExternalId
-                    };
-                    _logger.LogDebug($"Prepared Assume Role request with fields: {logAssumeRequestWithExternalId}");
-
-                }
-                _logger.LogTrace("Submitting Assume Role request.");
-                var assumeResult = AsyncHelpers.RunSync(() => stsClient.AssumeRoleAsync(assumeRequest));
-                _logger.LogTrace("Received response to Assume Role request.");
-                credentials = assumeResult.Credentials;
-            }
-            catch (Exception e)
-            {
-                _logger.LogError($"Error Occurred in AwsAuthenticate: {e.Message}");
-                throw;
-            }
-
-            return credentials;
-        }
-
-        public OAuthResponse OAuthAuthenticate(OAuthParameters parameters)
-        {
-            try
-            {
-                _logger.MethodEntry();
-                _logger.LogTrace($"Creating RestClient with OAuth URL: {parameters.OAuthUrl}");
-
-                var client = new RestClient(parameters.OAuthUrl)
-                {
-                    Timeout = -1
-                };
-
-                if (client.BaseUrl.Scheme != "https")
-                {
-                    var errorMessage = $"OAuth server needs to use HTTPS scheme but does not: {parameters.OAuthUrl}";
-                    _logger.LogError(errorMessage);
-                    throw new Exception(errorMessage);
-                }
-
-                var request = new RestRequest(Method.POST);
-                request.AddHeader("Accept", "application/json");
-                var clientId = parameters.ClientId;
-                var clientSecret = parameters.ClientSecret;
-                var plainTextBytes = Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}");
-                var authHeader = Convert.ToBase64String(plainTextBytes);
-                request.AddHeader("Authorization", $"Basic {authHeader}");
-                request.AddHeader("Content-Type", "application/x-www-form-urlencoded");
-                request.AddParameter("grant_type", parameters.GrantType);
-                request.AddParameter("scope", parameters.Scope);
-
-                var logHttpRequest = new
-                {
-                    Method = "POST",
-                    AcceptHeader = "application/json",
-                    AuthorizationHeader = "Basic **redacted**",
-                    ContentTypeHeader = "application/x-www-form-urlencoded",
-                    grant_type = parameters.GrantType,
-                    scope = parameters.Scope
-                };
-                _logger.LogDebug($"Prepared Rest Request: {logHttpRequest}");
-
-                _logger.LogTrace("Executing Rest request.");
-                var response = client.Execute(request);
-                _logger.LogTrace("Received responst to Rest request to OAUth");
-                var authResponse = JsonConvert.DeserializeObject<OAuthResponse>(response.Content);
-                _logger.LogTrace("Deserialized OAuthResponse.");
-                return authResponse;
-            }
-            catch (Exception e)
-            {
-                _logger.LogError($"Error Occurred in OAuthAuthenticate: {e.Message}");
-                throw;
-            }
         }
 
         private string ResolvePamField(string field, string fieldName)
