@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace aws_auth_library
+namespace Keyfactor.Extensions.Aws
 {
     public static class AwsClientCreator
     {
@@ -17,9 +17,9 @@ namespace aws_auth_library
             return awsServiceClient;
         }
 
-        public static T CreateAwsClientWithCredentials<T,U>(AwsExtensionCredential credential)
-            where T: AmazonServiceClient
-            where U: ClientConfig
+        public static T CreateAwsClientWithCredentials<T, U>(AwsExtensionCredential credential)
+            where T : AmazonServiceClient
+            where U : ClientConfig
         {
             // create ClientConfig object of the specific client type
             U clientConfig = (U)Activator.CreateInstance(typeof(U));

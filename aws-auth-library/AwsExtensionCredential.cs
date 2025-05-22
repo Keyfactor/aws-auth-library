@@ -2,7 +2,7 @@
 using Amazon.SecurityToken.Model;
 using System;
 
-namespace aws_auth_library
+namespace Keyfactor.Extensions.Aws
 {
     public class AwsExtensionCredential
     {
@@ -11,7 +11,7 @@ namespace aws_auth_library
         public CredentialMethod CredentialMethod { get; set; }
         public string RoleArn { get; set; }
 
-        public RegionEndpoint Region {  get; set; }
+        public RegionEndpoint Region { get; set; }
 
         public AwsExtensionCredential(CredentialMethod method, Credentials awsCredentials, string credentialProfile = null)
         {

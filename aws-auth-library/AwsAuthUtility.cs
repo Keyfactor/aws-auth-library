@@ -20,7 +20,8 @@ using Amazon.Runtime;
 using Amazon.Runtime.Internal.Util;
 using Amazon.SecurityToken;
 using Amazon.SecurityToken.Model;
-using aws_auth_library.OAuth.Models;
+using Keyfactor.Extensions.Aws.Models;
+using Keyfactor.Extensions.Aws.OAuth.Models;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
@@ -30,7 +31,7 @@ using RestSharp;
 
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
-namespace aws_auth_library
+namespace Keyfactor.Extensions.Aws
 {
     public class AwsAuthUtility
     {
@@ -49,7 +50,7 @@ namespace aws_auth_library
 
             _logger.LogDebug("Checking Client Machine field for prescence of credential [profile] value.");
             string roleArn, credentialProfile;
-            if(authParameters.RoleARN.StartsWith('['))
+            if (authParameters.RoleARN.StartsWith("["))
             {
                 _logger.LogTrace("Credential [profile] detected, parsing value.");
                 string[] split = authParameters.RoleARN.Split(']');
@@ -70,7 +71,7 @@ namespace aws_auth_library
             _logger.LogTrace($"AWS Region specified in Store Path - {region}");
             var endpoint = RegionEndpoint.GetBySystemName(region);
             _logger.LogDebug($"AWS Region Endpoint - {JsonConvert.SerializeObject(endpoint)}");
-            
+
             _logger.LogDebug("Selecting credential method.");
             var customFields = authParameters.CustomFields;
             CredentialMethod credentialMethod;

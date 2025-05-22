@@ -14,13 +14,20 @@
 
 using Newtonsoft.Json;
 
-namespace aws_auth_library.OAuth.Models
+namespace Keyfactor.Extensions.Aws.OAuth.Models
 {
     public class OAuthResponse
     {
-        [JsonProperty("token_type", NullValueHandling = NullValueHandling.Ignore)] public string TokenType { get; set; }
-        [JsonProperty("expires_in", NullValueHandling = NullValueHandling.Ignore)] public int ExpiresIn { get; set; }
-        [JsonProperty("access_token", NullValueHandling = NullValueHandling.Ignore)] public string AccessToken { get; set; }
-        [JsonProperty("scope", NullValueHandling = NullValueHandling.Ignore)] public string Scope { get; set; }
+        [JsonProperty("token_type", NullValueHandling = NullValueHandling.Ignore)]
+        public string TokenType { get; set; }
+
+        [JsonProperty("expires_in", NullValueHandling = NullValueHandling.Ignore)]
+        public int ExpiresIn { get; set; }
+
+        [JsonProperty("access_token", NullValueHandling = NullValueHandling.Ignore)]
+        public string AccessToken { get; set; }
+
+        [JsonProperty("scope", NullValueHandling = NullValueHandling.Ignore)]
+        public string Scope { get; set; }
     }
 }

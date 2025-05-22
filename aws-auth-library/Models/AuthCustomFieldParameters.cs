@@ -16,7 +16,7 @@
 using Newtonsoft.Json;
 using System.ComponentModel;
 
-namespace aws_auth_library
+namespace Keyfactor.Extensions.Aws.Models
 {
     public class AuthCustomFieldParameters
     {

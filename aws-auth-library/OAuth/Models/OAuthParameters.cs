@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-namespace aws_auth_library.OAuth.Models
+namespace Keyfactor.Extensions.Aws.OAuth.Models
 {
     public class OAuthParameters
     {
