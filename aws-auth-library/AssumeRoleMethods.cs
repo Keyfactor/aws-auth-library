@@ -58,23 +58,37 @@ namespace Keyfactor.Extensions.Aws
         public static Credentials AssumeRole(string accessKey, string accessSecret, string roleArn, ILogger logger, string externalId = null)
         {
             logger.MethodEntry();
-            Credentials credentials = null;
+
+            // TODO: make region specific
+            if (accessKey != null && accessSecret != null)
+            {
+                AmazonSecurityTokenServiceClient stsClient = new AmazonSecurityTokenServiceClient(accessKey, accessSecret);
+                logger.LogTrace("Created AWS STS client with IAM user credentials.");
+                return AssumeRole(stsClient, roleArn, logger, externalId);
+            }
+            else
+            {
+                // TODO: needs to load with Credential Profile in mind
+                AmazonSecurityTokenServiceClient stsClient = new AmazonSecurityTokenServiceClient();
+                logger.LogTrace("Created AWS STS client with default credential resolution.");
+                return AssumeRole(stsClient, roleArn, logger, externalId);
+            }
+        }
+
+        public static Credentials AssumeRole(Credentials credentials, string roleArn, ILogger logger, string externalId = null)
+        {
+            logger.MethodEntry();
+            // TODO: make region specific
+            AmazonSecurityTokenServiceClient stsClient = new AmazonSecurityTokenServiceClient(credentials);
+
+            return AssumeRole(stsClient, roleArn, logger, externalId);
+        }
+
+        private static Credentials AssumeRole(AmazonSecurityTokenServiceClient stsClient, string roleArn, ILogger logger, string externalId = null)
+        {
+            Credentials assumeRoleCredentials;
             try
             {
-                // TODO: make region specific
-                AmazonSecurityTokenServiceClient stsClient;
-                if (accessKey != null && accessSecret != null)
-                {
-                    stsClient = new AmazonSecurityTokenServiceClient(accessKey, accessSecret);
-                    logger.LogTrace("Created AWS STS client with IAM user credentials.");
-                }
-                else
-                {
-                    // TODO: needs to load with Credential Profile in mind
-                    stsClient = new AmazonSecurityTokenServiceClient();
-                    logger.LogTrace("Created AWS STS client with default credential resolution.");
-                }
-
                 var assumeRequest = new AssumeRoleRequest
                 {
                     RoleArn = roleArn,
@@ -107,7 +121,7 @@ namespace Keyfactor.Extensions.Aws
                 logger.LogTrace("Submitting Assume Role request.");
                 var assumeResult = AsyncHelpers.RunSync(() => stsClient.AssumeRoleAsync(assumeRequest));
                 logger.LogTrace("Received response to Assume Role request.");
-                credentials = assumeResult.Credentials;
+                assumeRoleCredentials = assumeResult.Credentials;
             }
             catch (Exception e)
             {
@@ -115,7 +129,8 @@ namespace Keyfactor.Extensions.Aws
                 throw;
             }
 
-            return credentials;
+            return assumeRoleCredentials;
         }
+
     }
 }

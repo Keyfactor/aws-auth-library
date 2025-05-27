@@ -14,12 +14,16 @@
 
 using System;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using Amazon;
+using Amazon.IdentityManagement.Model;
 using Amazon.Runtime;
+using Amazon.Runtime.CredentialManagement;
 using Amazon.Runtime.Internal.Util;
 using Amazon.SecurityToken;
 using Amazon.SecurityToken.Model;
+using Amazon.Util;
 using Keyfactor.Extensions.Aws.Models;
 using Keyfactor.Extensions.Aws.OAuth.Models;
 using Keyfactor.Logging;
@@ -213,22 +217,50 @@ namespace Keyfactor.Extensions.Aws
             return null; // TODO: some way to create Credentials object with defaults?
         }
 
-        private Credentials CredentialsFor_CredentialProfile(string profile)
+        private Credentials CredentialsFor_CredentialProfile(string profileName)
         {
-            // TODO: implement
-            throw new NotImplementedException("Not implemented");
+            // TODO: logging, error handling
+            _logger.MethodEntry();
+            var credentialProfileChain = new CredentialProfileStoreChain();
+
+            // TODO: attempt to resolve credential profile without having to enumerate through all profiles
+            var profiles = credentialProfileChain.ListProfiles();
+            _logger.LogTrace($"Found {profiles.Count} profiles.");
+
+            CredentialProfile credentialProfile = null;
+            foreach(var foundProfile in profiles)
+            {
+                _logger.LogTrace($"Found profile: {foundProfile.Name}");
+                if (string.Equals(profileName, foundProfile.Name))
+                {
+                    _logger.LogDebug($"Found matching credential profile with name {profileName}");
+                    credentialProfile = foundProfile;
+                    break;
+                }
+            }
+
+            if (credentialProfile == null)
+            {
+                _logger.LogError("Credential profile was not loaded successfully.");
+                // TODO: throw exception
+                // throw;
+            }
+
+            _logger.LogDebug("Credential profile found. Loading credentials from profile.");
+            var credentials = credentialProfile.GetAWSCredentials(credentialProfileChain);
+
+            return (Credentials) credentials;
         }
 
         private Credentials CredentialsFor_AssumeRoleDefaultSdk(Credentials originalCredentials, string roleArn, string externalId)
         {
-            // use SDK credential resolution, but run Assume Role
+            // run Assume Role with existing Credentials object (from previous SDK resolution)
             _logger.LogInformation("Using default AWS SDK credential resolution with Assume Role for creating AWS Credentials.");
 
             _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
             _logger.LogTrace("Attempting to assume new Role with AWS using default AWS SDK credential.");
-            // TODO: actually pass Credentials object to method supporting AssumeRole with Credentials
-            var awsCredentials = AssumeRoleMethods.AssumeRole(null, null, roleArn, _logger, externalId);
+            var awsCredentials = AssumeRoleMethods.AssumeRole(originalCredentials, roleArn, _logger, externalId);
             return awsCredentials;
         }
 
