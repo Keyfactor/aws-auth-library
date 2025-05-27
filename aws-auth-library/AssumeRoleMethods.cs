@@ -15,10 +15,10 @@ namespace Keyfactor.Extensions.Aws
 {
     public static class AssumeRoleMethods
     {
-        public static Credentials AssumeRoleFromOAuth(OAuthResponse authResponse, string roleArn, ILogger logger)
+        public static AWSCredentials AssumeRoleFromOAuth(OAuthResponse authResponse, string roleArn, ILogger logger)
         {
             logger.MethodEntry();
-            Credentials credentials = null;
+            AWSCredentials credentials = null;
             try
             {
                 // TODO: make region specific
@@ -55,7 +55,7 @@ namespace Keyfactor.Extensions.Aws
             return credentials;
         }
 
-        public static Credentials AssumeRole(string accessKey, string accessSecret, string roleArn, ILogger logger, string externalId = null)
+        public static AWSCredentials AssumeRole(string accessKey, string accessSecret, string roleArn, ILogger logger, string externalId = null)
         {
             logger.MethodEntry();
 
@@ -75,7 +75,7 @@ namespace Keyfactor.Extensions.Aws
             }
         }
 
-        public static Credentials AssumeRole(Credentials credentials, string roleArn, ILogger logger, string externalId = null)
+        public static AWSCredentials AssumeRole(AWSCredentials credentials, string roleArn, ILogger logger, string externalId = null)
         {
             logger.MethodEntry();
             // TODO: make region specific
@@ -84,9 +84,9 @@ namespace Keyfactor.Extensions.Aws
             return AssumeRole(stsClient, roleArn, logger, externalId);
         }
 
-        private static Credentials AssumeRole(AmazonSecurityTokenServiceClient stsClient, string roleArn, ILogger logger, string externalId = null)
+        private static AWSCredentials AssumeRole(AmazonSecurityTokenServiceClient stsClient, string roleArn, ILogger logger, string externalId = null)
         {
-            Credentials assumeRoleCredentials;
+            AWSCredentials assumeRoleCredentials;
             try
             {
                 var assumeRequest = new AssumeRoleRequest
