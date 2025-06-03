@@ -13,21 +13,12 @@
 // limitations under the License.
 
 using System;
-using System.Net;
-using System.Security.Cryptography;
-using System.Text;
 using Amazon;
-using Amazon.IdentityManagement.Model;
 using Amazon.Runtime;
 using Amazon.Runtime.CredentialManagement;
-using Amazon.Runtime.Internal.Util;
-using Amazon.SecurityToken;
-using Amazon.SecurityToken.Model;
-using Amazon.Util;
 using Keyfactor.Extensions.Aws.Models;
 using Keyfactor.Extensions.Aws.OAuth.Models;
 using Keyfactor.Logging;
-using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
