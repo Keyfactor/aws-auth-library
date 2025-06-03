@@ -80,12 +80,13 @@ namespace Keyfactor.Extensions.Aws
             logger.MethodEntry();
             // TODO: make region specific
             AmazonSecurityTokenServiceClient stsClient = new AmazonSecurityTokenServiceClient(credentials);
-
+            logger.LogTrace("Created AWS STS client with provided credentials object.");
             return AssumeRole(stsClient, roleArn, logger, externalId);
         }
 
         private static AWSCredentials AssumeRole(AmazonSecurityTokenServiceClient stsClient, string roleArn, ILogger logger, string externalId = null)
         {
+            logger.MethodEntry();
             AWSCredentials assumeRoleCredentials;
             try
             {

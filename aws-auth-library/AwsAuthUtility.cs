@@ -32,10 +32,10 @@ namespace Keyfactor.Extensions.Aws
         private readonly ILogger _logger;
         private readonly IPAMSecretResolver _pam;
 
-        public AwsAuthUtility(IPAMSecretResolver pam, ILogger logger)
+        public AwsAuthUtility(IPAMSecretResolver pam)
         {
             _pam = pam;
-            _logger = logger;
+            _logger = LogHandler.GetClassLogger<AwsAuthUtility>();
         }
 
         public AwsExtensionCredential GetCredentials(AuthenticationParameters authParameters)
@@ -102,7 +102,9 @@ namespace Keyfactor.Extensions.Aws
             else
             {
                 // no auth method set
-                throw new Exception("No Auth method selected. This is an invalid configuration.");
+                var errorMsg = "No Auth method selected. This is an invalid configuration.";
+                _logger.LogError(errorMsg);
+                throw new Exception(errorMsg);
             }
             _logger.LogInformation($"Credential method in use for AWS Auth - {credentialMethod}");
 
@@ -155,16 +157,17 @@ namespace Keyfactor.Extensions.Aws
                     break;
             }
 
-            // TODO: add logging
             // store parameter values into final credential object
             var extensionCredential = new AwsExtensionCredential(credentialMethod, awsCredentials);
             extensionCredential.RoleArn = roleArn;
             extensionCredential.Region = endpoint;
+            _logger.LogInformation($"AWS credential resolving completed.");
             return extensionCredential;
         }
 
         private AWSCredentials CredentialsFor_IamUser(string accessKey, string accessSecret, string roleArn, string region, string externalId)
         {
+            _logger.MethodEntry();
             _logger.LogInformation("Using IAM User authentication method for creating AWS Credentials.");
             var resolvedAccessKey = ResolvePamField(accessKey, "IamUserAccessKey");
             var resolvedAccessSecret = ResolvePamField(accessSecret, "IamUserAccessSecret");
@@ -178,6 +181,7 @@ namespace Keyfactor.Extensions.Aws
 
         private AWSCredentials CredentialsFor_OAuthProvider(string clientId, string clientSecret, string url, string grantType, string scope, string roleArn, string region)
         {
+            _logger.MethodEntry();
             _logger.LogInformation("Using OAuth authentication method for creating AWS Credentials.");
             var resolvedClientId = ResolvePamField(clientId, "OAuthClientId");
             var resolvedClientSecret = ResolvePamField(clientSecret, "OAuthClientSecret");
@@ -203,6 +207,7 @@ namespace Keyfactor.Extensions.Aws
 
         private AWSCredentials CredentialsFor_DefaultSdk()
         {
+            _logger.MethodEntry();
             _logger.LogInformation("Using default AWS SDK credential resolution for creating AWS Credentials.");
             _logger.LogDebug($"Default Role ARN found by SDK will be used. Specified AWS Role ARN will not be used.");
             return null; // TODO: some way to create Credentials object with defaults?
@@ -210,8 +215,9 @@ namespace Keyfactor.Extensions.Aws
 
         private AWSCredentials CredentialsFor_CredentialProfile(string profileName)
         {
-            // TODO: logging, error handling
             _logger.MethodEntry();
+            _logger.LogInformation("Using credential profile for creating AWS Credentials.");
+            _logger.LogDebug($"Credential profile to load - {profileName}");
             var credentialProfileChain = new CredentialProfileStoreChain();
 
             // TODO: attempt to resolve credential profile without having to enumerate through all profiles
@@ -232,9 +238,9 @@ namespace Keyfactor.Extensions.Aws
 
             if (credentialProfile == null)
             {
-                _logger.LogError("Credential profile was not loaded successfully.");
-                // TODO: throw exception
-                // throw;
+                var errorMsg = "Credential profile was not loaded successfully.";
+                _logger.LogError(errorMsg);
+                throw new Exception(errorMsg);
             }
 
             _logger.LogDebug("Credential profile found. Loading credentials from profile.");
@@ -243,6 +249,7 @@ namespace Keyfactor.Extensions.Aws
 
         private AWSCredentials CredentialsFor_AssumeRoleDefaultSdk(AWSCredentials originalCredentials, string roleArn, string externalId)
         {
+            _logger.MethodEntry();
             // run Assume Role with existing Credentials object (from previous SDK resolution)
             _logger.LogInformation("Using default AWS SDK credential resolution with Assume Role for creating AWS Credentials.");
 
