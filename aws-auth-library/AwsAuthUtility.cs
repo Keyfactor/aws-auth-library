@@ -16,6 +16,7 @@ using System;
 using Amazon;
 using Amazon.Runtime;
 using Amazon.Runtime.CredentialManagement;
+using Amazon.Runtime.Credentials;
 using Keyfactor.Extensions.Aws.Models;
 using Keyfactor.Extensions.Aws.OAuth.Models;
 using Keyfactor.Logging;
@@ -61,10 +62,10 @@ namespace Keyfactor.Extensions.Aws
                 credentialProfile = "";
             }
             _logger.LogDebug($"AWS Role ARN - {roleArn}");
-            string region = authParameters.Region;
-            _logger.LogTrace($"AWS Region specified in Store Path - {region}");
-            var endpoint = RegionEndpoint.GetBySystemName(region);
-            _logger.LogDebug($"AWS Region Endpoint - {JsonConvert.SerializeObject(endpoint)}");
+            string regionInput = authParameters.Region;
+            _logger.LogTrace($"AWS Region specified in Store Path - {regionInput}");
+            var region = RegionEndpoint.GetBySystemName(regionInput);
+            _logger.LogDebug($"AWS Region Endpoint - {JsonConvert.SerializeObject(region)}");
 
             _logger.LogDebug("Selecting credential method.");
             var fields = authParameters.CustomFields;
@@ -109,7 +110,6 @@ namespace Keyfactor.Extensions.Aws
             _logger.LogInformation($"Credential method in use for AWS Auth - {credentialMethod}");
 
             AWSCredentials awsCredentials;
-            // TODO: use Region Endpoint for Assume Role calls
             switch (credentialMethod)
             {
                 case CredentialMethod.IamUser:
@@ -134,7 +134,7 @@ namespace Keyfactor.Extensions.Aws
                     // get default sdk credentials first
                     AWSCredentials initialCredentials = CredentialsFor_DefaultSdk();
                     // then get final credentials via assume role with default sdk credentials
-                    awsCredentials = CredentialsFor_AssumeRoleDefaultSdk(initialCredentials, roleArn, fields.ExternalId);
+                    awsCredentials = CredentialsFor_AssumeRoleDefaultSdk(initialCredentials, roleArn, region, fields.ExternalId);
                     break;
 
                 case CredentialMethod.DefaultSdk_CredentialProfile:
@@ -147,7 +147,7 @@ namespace Keyfactor.Extensions.Aws
                     // get credentials from credential profile first
                     initialCredentials = CredentialsFor_CredentialProfile(credentialProfile);
                     // then get final credentials via assume role with credentials profile
-                    awsCredentials = CredentialsFor_AssumeRoleDefaultSdk(initialCredentials, roleArn, fields.ExternalId);
+                    awsCredentials = CredentialsFor_AssumeRoleDefaultSdk(initialCredentials, roleArn, region, fields.ExternalId);
                     break;
 
                 case CredentialMethod.DefaultSdk:
@@ -160,26 +160,28 @@ namespace Keyfactor.Extensions.Aws
             // store parameter values into final credential object
             var extensionCredential = new AwsExtensionCredential(credentialMethod, awsCredentials);
             extensionCredential.RoleArn = roleArn;
-            extensionCredential.Region = endpoint;
+            extensionCredential.Region = region;
             _logger.LogInformation($"AWS credential resolving completed.");
             return extensionCredential;
         }
 
-        private AWSCredentials CredentialsFor_IamUser(string accessKey, string accessSecret, string roleArn, string region, string externalId)
+        private AWSCredentials CredentialsFor_IamUser(string accessKey, string accessSecret, string roleArn, RegionEndpoint region, string externalId)
         {
             _logger.MethodEntry();
             _logger.LogInformation("Using IAM User authentication method for creating AWS Credentials.");
             var resolvedAccessKey = ResolvePamField(accessKey, "IamUserAccessKey");
             var resolvedAccessSecret = ResolvePamField(accessSecret, "IamUserAccessSecret");
 
-            _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
-            _logger.LogTrace("Attempting to authenticate with AWS using IAM access credentials.");
-            var awsCredentials = AssumeRoleMethods.AssumeRole(resolvedAccessKey, resolvedAccessSecret, roleArn, _logger, externalId);
+            _logger.LogTrace("Attempting to authenticate with AWS using Basic AWS access credentials.");
+            var basicCredentials = new BasicAWSCredentials(resolvedAccessKey, resolvedAccessSecret);
+
+            _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
+            var awsCredentials = AssumeRoleMethods.AssumeRole(basicCredentials, roleArn, region, _logger, externalId);
             return awsCredentials;
         }
 
-        private AWSCredentials CredentialsFor_OAuthProvider(string clientId, string clientSecret, string url, string grantType, string scope, string roleArn, string region)
+        private AWSCredentials CredentialsFor_OAuthProvider(string clientId, string clientSecret, string url, string grantType, string scope, string roleArn, RegionEndpoint region)
         {
             _logger.MethodEntry();
             _logger.LogInformation("Using OAuth authentication method for creating AWS Credentials.");
@@ -201,7 +203,7 @@ namespace Keyfactor.Extensions.Aws
             _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
             _logger.LogTrace("Attempting to authenticate with AWS using OAuth response.");
-            var awsCredentials = AssumeRoleMethods.AssumeRoleFromOAuth(authResponse, roleArn, _logger);
+            var awsCredentials = AssumeRoleMethods.AssumeRoleFromOAuth(authResponse, roleArn, region, _logger);
             return awsCredentials;
         }
 
@@ -209,8 +211,9 @@ namespace Keyfactor.Extensions.Aws
         {
             _logger.MethodEntry();
             _logger.LogInformation("Using default AWS SDK credential resolution for creating AWS Credentials.");
-            _logger.LogDebug($"Default Role ARN found by SDK will be used. Specified AWS Role ARN will not be used.");
-            return null; // TODO: some way to create Credentials object with defaults?
+            _logger.LogDebug($"Default Role ARN or identity resolved by SDK will be used. Specified AWS Role ARN will not be used unless Default Assume Role was flagged.");
+            var defaultCredentials = DefaultAWSCredentialsIdentityResolver.GetCredentials();
+            return defaultCredentials;
         }
 
         private AWSCredentials CredentialsFor_CredentialProfile(string profileName)
@@ -236,7 +239,7 @@ namespace Keyfactor.Extensions.Aws
             }
         }
 
-        private AWSCredentials CredentialsFor_AssumeRoleDefaultSdk(AWSCredentials originalCredentials, string roleArn, string externalId)
+        private AWSCredentials CredentialsFor_AssumeRoleDefaultSdk(AWSCredentials originalCredentials, string roleArn, RegionEndpoint region, string externalId)
         {
             _logger.MethodEntry();
             // run Assume Role with existing Credentials object (from previous SDK resolution)
@@ -245,7 +248,7 @@ namespace Keyfactor.Extensions.Aws
             _logger.LogDebug($"Assuming AWS Role with ARN - {roleArn}");
 
             _logger.LogTrace("Attempting to assume new Role with AWS using default AWS SDK credential.");
-            var awsCredentials = AssumeRoleMethods.AssumeRole(originalCredentials, roleArn, _logger, externalId);
+            var awsCredentials = AssumeRoleMethods.AssumeRole(originalCredentials, roleArn, region, _logger, externalId);
             return awsCredentials;
         }
 
