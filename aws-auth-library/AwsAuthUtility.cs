@@ -218,33 +218,22 @@ namespace Keyfactor.Extensions.Aws
             _logger.MethodEntry();
             _logger.LogInformation("Using credential profile for creating AWS Credentials.");
             _logger.LogDebug($"Credential profile to load - {profileName}");
+
             var credentialProfileChain = new CredentialProfileStoreChain();
-
-            // TODO: attempt to resolve credential profile without having to enumerate through all profiles
-            var profiles = credentialProfileChain.ListProfiles();
-            _logger.LogTrace($"Found {profiles.Count} profiles.");
-
-            CredentialProfile credentialProfile = null;
-            foreach(var foundProfile in profiles)
+            CredentialProfile credentialProfile;
+            bool profileFound = credentialProfileChain.TryGetProfile(profileName, out credentialProfile);
+            
+            if (profileFound)
             {
-                _logger.LogTrace($"Found profile: {foundProfile.Name}");
-                if (string.Equals(profileName, foundProfile.Name))
-                {
-                    _logger.LogDebug($"Found matching credential profile with name {profileName}");
-                    credentialProfile = foundProfile;
-                    break;
-                }
+                _logger.LogDebug("Credential profile found. Loading credentials from profile.");
+                return credentialProfile.GetAWSCredentials(credentialProfileChain);
             }
-
-            if (credentialProfile == null)
+            else
             {
-                var errorMsg = "Credential profile was not loaded successfully.";
+                var errorMsg = $"Credential profile - {profileName} - was not loaded successfully.";
                 _logger.LogError(errorMsg);
                 throw new Exception(errorMsg);
             }
-
-            _logger.LogDebug("Credential profile found. Loading credentials from profile.");
-            return credentialProfile.GetAWSCredentials(credentialProfileChain);
         }
 
         private AWSCredentials CredentialsFor_AssumeRoleDefaultSdk(AWSCredentials originalCredentials, string roleArn, string externalId)

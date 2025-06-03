@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Keyfactor.Extensions.Aws</RootNamespace>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <RepositoryUrl>https://github.com/Keyfactor/aws-auth-library</RepositoryUrl>
     <AssemblyName>Keyfactor.Extensions.Aws.Auth</AssemblyName>
   </PropertyGroup>
@@ -13,7 +13,7 @@
     <PackageReference Include="AWSSDK.Core" Version="3.7.102" />
     <PackageReference Include="AWSSDK.IdentityManagement" Version="3.7.100.33" />
     <PackageReference Include="AWSSDK.SecurityToken" Version="3.7.100.32" />
-    <PackageReference Include="Keyfactor.Logging" Version="1.2.0" />
+    <PackageReference Include="Keyfactor.Logging" Version="1.1.2" />
     <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="1.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="RestSharp" Version="106.13.0" />
