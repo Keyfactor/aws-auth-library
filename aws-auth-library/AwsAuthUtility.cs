@@ -161,6 +161,12 @@ namespace Keyfactor.Extensions.Aws
             var extensionCredential = new AwsExtensionCredential(credentialMethod, awsCredentials);
             extensionCredential.RoleArn = roleArn;
             extensionCredential.Region = region;
+
+            if (!string.IsNullOrEmpty(credentialProfile))
+            {
+                extensionCredential.CredentialProfile = credentialProfile;
+            }
+
             _logger.LogInformation($"AWS credential resolving completed.");
             return extensionCredential;
         }
