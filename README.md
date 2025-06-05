@@ -17,6 +17,8 @@ Unless otherwise specified, the authentication method will always perform an Ass
 The AWS SDK provides several methods for default credential lookup when no explicit credentials are provided.
 An exhaustive list can be found here: [(AWS Documentation) Credential and profile resolution](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html)
 
+This method supports the usage of EC2 instance credentials with the IAM Role assigned.
+
 If a specific credentials profile should be used from a shared credentials file on the system running the AWS integration, it should be specified with the Role ARN as detailed below.
 
 By default, using the Default SDK credential inference _will not_ perform any Assume Role call, and the credential context will be preserved.
