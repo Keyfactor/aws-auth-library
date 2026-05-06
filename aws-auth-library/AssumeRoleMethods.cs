@@ -101,7 +101,7 @@ namespace Keyfactor.Extensions.Aws
                 else
                 {
                     // include sts:ExternalId with assume role request
-                    assumeRequest.ExternalId = externalId;
+                    assumeRequest.ExternalId = externalId.Trim();
                     var logAssumeRequestWithExternalId = new
                     {
                         assumeRequest.RoleArn,

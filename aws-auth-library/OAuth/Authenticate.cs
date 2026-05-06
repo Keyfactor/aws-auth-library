@@ -32,20 +32,18 @@ namespace Keyfactor.Extensions.Aws.OAuth
             {
                 logger.MethodEntry();
                 logger.LogTrace($"Creating RestClient with OAuth URL: {parameters.OAuthUrl}");
+                var options = new RestClientOptions(parameters.OAuthUrl) { Timeout = TimeSpan.FromMilliseconds(-1) };
 
-                var client = new RestClient(parameters.OAuthUrl)
-                {
-                    Timeout = -1
-                };
+                var client = new RestClient(options);
 
-                if (client.BaseUrl.Scheme != "https")
+                if (client.Options.BaseUrl.Scheme != "https")
                 {
                     var errorMessage = $"OAuth server needs to use HTTPS scheme but does not: {parameters.OAuthUrl}";
                     logger.LogError(errorMessage);
                     throw new Exception(errorMessage);
                 }
+                var request = new RestRequest("", Method.Post);
 
-                var request = new RestRequest(Method.POST);
                 request.AddHeader("Accept", "application/json");
                 var clientId = parameters.ClientId;
                 var clientSecret = parameters.ClientSecret;

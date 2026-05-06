@@ -1,10 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <RootNamespace>Keyfactor.Extensions.Aws</RootNamespace>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Version>0.5.1</Version>
+    <Version>0.5.2</Version>
     <RepositoryUrl>https://github.com/Keyfactor/aws-auth-library</RepositoryUrl>
     <AssemblyName>Keyfactor.Extensions.Aws.Auth</AssemblyName>
     <Copyright>Copyright (c) Keyfactor 2025</Copyright>
@@ -16,13 +16,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.Core" Version="4.0.0.6" />
-    <PackageReference Include="AWSSDK.IdentityManagement" Version="4.0.1.2" />
-    <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.0.4" />
+    <PackageReference Include="AWSSDK.Core" Version="4.0.6.1" />
+    <PackageReference Include="AWSSDK.IdentityManagement" Version="4.0.9.22" />
+    <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.6.3" />
     <PackageReference Include="Keyfactor.Logging" Version="1.1.2" />
     <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="1.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="RestSharp" Version="106.13.0" />
+    <PackageReference Include="RestSharp" Version="114.0.0" />
   </ItemGroup>
 
   <ItemGroup>
